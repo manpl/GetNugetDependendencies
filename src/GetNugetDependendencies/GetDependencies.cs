@@ -16,6 +16,12 @@ namespace GetNugetDependendencies
         [ValidateNotNullOrEmpty]
         public string NugetConfigPath { get; set; }
 
+        //[Parameter(Mandatory = true, HelpMessage = "Id of the package")]
+        //[ValidateNotNullOrEmpty]
+        //public string PackageId { get; set; }
+
+
+
         [Parameter(Mandatory = false, HelpMessage = "Packages source. Defaults to 'https://packages.nuget.org/api/v2'")]
         [ValidateNotNullOrEmpty]
         public string NugetSource { get; set; }
@@ -54,21 +60,29 @@ namespace GetNugetDependendencies
                 var package = repository.FindPackage(packageDesc.Id, version, true, true);
 
                 ListDependencies(package, repository);
+                WriteObject("");
             }
         }
 
         private void ListDependencies(IPackage package, IPackageRepository repository, string prefix = "")
         {
-            WriteObject((string.IsNullOrEmpty(prefix) ? "" : " |" + prefix) + package.GetFullName());
+            WriteObject(prefix + "-- " + package.GetFullName());
             var highestFxVersion = package.GetSupportedFrameworks().Where(fx => fx.Identifier == this.Framework).OrderByDescending(v => v.Version).First();
 
-            var dependencies = package.GetCompatiblePackageDependencies(highestFxVersion);
+            var dependencies = package.GetCompatiblePackageDependencies(highestFxVersion).ToList();
+
+            if (!dependencies.Any())
+            {
+                return;
+            }
 
             foreach (var dep in dependencies)
             {
                 var dependantPackage = repository.ResolveDependency(dep, true, true);
-                ListDependencies(dependantPackage, repository, prefix + "---");
+                ListDependencies(dependantPackage, repository,  prefix + "   |");
             }
+
+            WriteObject(prefix);
         }
     }
 }
