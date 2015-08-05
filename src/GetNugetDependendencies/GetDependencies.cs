@@ -3,6 +3,7 @@ using NuGet;
 using System.Linq;
 using System.Management.Automation;
 using System;
+using GetNugetDependendencies.DataStructures;
 
 namespace GetNugetDependendencies
 {
@@ -28,6 +29,8 @@ namespace GetNugetDependendencies
         //[Parameter(Mandatory = false, HelpMessage = "Framework")]
         //public string Framework { get; set; }
 
+        private IPackageRepository Repository;
+
         protected override void BeginProcessing()
         {
             base.BeginProcessing();
@@ -50,19 +53,19 @@ namespace GetNugetDependendencies
         {
             base.ProcessRecord();
 
-            var repository = PackageRepositoryFactory.Default.CreateRepository(this.NugetSource);
+            Repository = PackageRepositoryFactory.Default.CreateRepository(this.NugetSource);
             
             if(this.ParameterSetName == "Config")
             {
-                ProcessConfig(repository);
+                ProcessConfig();
             }
             else
             {
-                ProcessPackage(repository);
+                ProcessPackage();
             }
         }
 
-        private void ProcessPackage(IPackageRepository repository)
+        private void ProcessPackage()
         {
             WriteDebug("Processing " + this.PackageId.ToString() + (string.IsNullOrEmpty(Version) ? "" : ("@" + Version)));
 
@@ -70,47 +73,49 @@ namespace GetNugetDependendencies
 
             if (string.IsNullOrEmpty(Version))
             {
-                package = repository.FindPackagesById(this.PackageId).OrderByDescending(p => p.Version).FirstOrDefault();
+                package = Repository.FindPackagesById(this.PackageId).OrderByDescending(p => p.Version).FirstOrDefault();
             }
             else
             {
                 var version = SemanticVersion.Parse(this.Version);
-                package = repository.FindPackage(this.PackageId, version, true, true);
+                package = Repository.FindPackage(this.PackageId, version, true, true);
             }
 
+            var dependencyTree = new TreeElement<IPackage>(package);
 
-            ListDependencies(package, repository);
+            ListDependencies(dependencyTree, dependencyTree);
             WriteObject("");
         }
 
-        private void ProcessConfig(IPackageRepository repository)
+        private void ProcessConfig()
         {
-            var config = PackagesConfig.ReadFromFile(NugetConfigPath);
+            //var config = PackagesConfig.ReadFromFile(NugetConfigPath);
 
-            foreach (var packageDesc in config.Packages)
-            {
-                WriteDebug("Processing " + packageDesc.ToString());
-                var version = SemanticVersion.Parse(packageDesc.Version);
-                var package = repository.FindPackage(packageDesc.Id, version, true, true);
+            //foreach (var packageDesc in config.Packages)
+            //{
+            //    WriteDebug("Processing " + packageDesc.ToString());
+            //    var version = SemanticVersion.Parse(packageDesc.Version);
+            //    var package = Repository.FindPackage(packageDesc.Id, version, true, true);
 
-                ListDependencies(package, repository);
-                WriteObject("");
-            }
+            //    ListDependencies(null, package);
+            //    WriteObject("");
+            //}
         }
 
-        private void ListDependencies(IPackage package, IPackageRepository repository, string prefix = "")
+        private void ListDependencies(TreeElement<IPackage> dependencyTree, TreeElement<IPackage> currentElement)
         {
-            if(package == null)
-            {
-                WriteDebug("Null package passed");
-                return;
-            }
+            WriteDebug("Processing dependencies" + currentElement.Element.GetFullName());
 
-            WriteObject(prefix + "-- " + package.GetFullName());
-            // DNX DNXCore
-            var highestFxVersion = package.GetSupportedFrameworks().OrderByDescending(v => v.Version).First();
+            //if(package == null)
+            //{
+            //    WriteDebug("Null package passed");
+            //    return;
+            //}
 
-            var dependencies = package.GetCompatiblePackageDependencies(highestFxVersion).ToList();
+            //WriteObject(prefix + "-- " + package.GetFullName());
+            //var highestFxVersion = currentElement.Element.GetSupportedFrameworks().OrderByDescending(v => v.Version).First();
+            var dependencies = currentElement.Element.GetCompatiblePackageDependencies(null);
+            //var dependencies = currentElement.Element.GetCompatiblePackageDependencies(highestFxVersion).ToList();
 
             if (!dependencies.Any())
             {
@@ -119,11 +124,22 @@ namespace GetNugetDependendencies
 
             foreach (var dep in dependencies)
             {
-                var dependantPackage = repository.ResolveDependency(dep, true, true);
-                ListDependencies(dependantPackage, repository,  prefix + "   |");
+                var dependantPackage = Repository.ResolveDependency(dep, true, true);
+
+                var inTheTree = dependencyTree.Get(dependantPackage);
+
+                if(inTheTree != null)
+                {
+                    currentElement.AddChild(inTheTree);
+                    WriteDebug("element already in the tree " + dependantPackage.GetFullName());
+                    return;
+                }
+                
+                //dependencyTree.AddChildren();
+                ListDependencies(dependencyTree, currentElement.AddChild(dependantPackage));
             }
 
-            WriteObject(prefix);
+            //WriteObject(prefix);
         }
     }
 }

@@ -52,6 +52,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataStructures\TreeElement.cs" />
     <Compile Include="GetDependencies.cs" />
     <Compile Include="Nuget\NugetPackageDescriptor.cs" />
     <Compile Include="Nuget\PackagesConfig.cs" />
