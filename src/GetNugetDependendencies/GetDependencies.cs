@@ -107,10 +107,8 @@ namespace GetNugetDependendencies
             }
 
             WriteObject(prefix + "-- " + package.GetFullName());
-            // DNX DNXCore
-            var highestFxVersion = package.GetSupportedFrameworks().OrderByDescending(v => v.Version).First();
-
-            var dependencies = package.GetCompatiblePackageDependencies(highestFxVersion).ToList();
+            //var highestFxVersion = package.GetSupportedFrameworks().OrderByDescending(v => v.Version).First();
+            var dependencies = package.GetCompatiblePackageDependencies(null).ToList();
 
             if (!dependencies.Any())
             {
@@ -122,8 +120,6 @@ namespace GetNugetDependendencies
                 var dependantPackage = repository.ResolveDependency(dep, true, true);
                 ListDependencies(dependantPackage, repository,  prefix + "   |");
             }
-
-            WriteObject(prefix);
         }
     }
 }
